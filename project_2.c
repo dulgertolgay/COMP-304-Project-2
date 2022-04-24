@@ -2,10 +2,24 @@
 #include <pthread.h>
 #include <sys/time.h>
 #include <string.h>
+#define t 2
 int simulationTime = 120;    // simulation time
 int seed = 10;               // seed for randomness
 int emergencyFrequency = 40; // frequency of emergency
 float p = 0.2;               // probability of a ground job (launch & assembly)
+
+//global var
+int timeZero;
+int jobid = 1;
+    //queues for all different jobs
+    Queue* landQ;
+    Queue* launchQ;
+    Queue* assemblyQ;
+    //mutexes for each q
+    pthread_mutex_t MlandQ;
+    pthread_mutex_t MlaunchQ;
+    pthread_mutex_t MassemblyQ;
+//global var
 
 void* LandingJob(void *arg); 
 void* LaunchJob(void *arg);
@@ -51,9 +65,49 @@ int main(int argc,char **argv){
         else if(!strcmp(argv[i], "-t")) {simulationTime = atoi(argv[++i]);}
         else if(!strcmp(argv[i], "-s"))  {seed = atoi(argv[++i]);}
     }
+    landQ = ConstructQueue(100);
+    launchQ = ConstructQueue(100);
+    assemblyQ = ConstructQueue(100);
+    //mutex init for q's
+    pthread_mutex_init(&MlandQ, NULL);
+    pthread_mutex_init(&MassemblyQ, NULL);
+    pthread_mutex_init(&MlaunchQ, NULL);
     
+
     srand(seed); // feed the seed
+    timeZero = time(NULL);
+    pthread_t towerid;
+    int padID = 1;
+      pthread_create(&towerid, NULL, ControlTower,&padID);
+    while(time(NULL) - timeZero <= 120) {
+
+    double r = (double) rand() / (double) RAND_MAX; //uniform random between 0-1
+    if (r <= p/2) {
+    	//launch
+    	pthread_t lathread;
+    	pthread_create(&lathread,NULL,LaunchJob,NULL);
+    }
+    if (r>= 1-p/2) {
+    	//assembly
+    	pthread_t asthread;
+    	pthread_create(&asthread,NULL,AssemblyJob,NULL);
+    }
+    else {
+    	//landing
+    	pthread_t lthread;
+    	pthread_create(&lthread,NULL,LandingJob,NULL);
+    }
     
+    
+   
+    pthread_sleep(t);
+    }
+
+
+  
+    
+    pthread_join(towerid,NULL);
+
     /* Queue usage example
         Queue *myQ = ConstructQueue(1000);
         Job j;
@@ -70,25 +124,93 @@ int main(int argc,char **argv){
 
 // the function that creates plane threads for landing
 void* LandingJob(void *arg){
+    pthread_mutex_lock(&MlandQ);
+    Job j;
+    j.ID = ++jobid;
+    j.type = 1;
+    Enqueue(landQ,j);
+    printf("job added landq");
+    fflush(stdout);
+    pthread_mutex_unlock(&MlandQ);
 
 }
 
 // the function that creates plane threads for departure
 void* LaunchJob(void *arg){
-
+    pthread_mutex_lock(&MlaunchQ);
+    Job j;
+    j.ID = ++jobid;
+    j.type = 2;
+    Enqueue(launchQ,j);
+    printf("job added launchQ");
+    fflush(stdout);
+    pthread_mutex_unlock(&MlaunchQ);
 }
 
 // the function that creates plane threads for emergency landing
-void* EmergencyJob(void *arg){
+void* EmergencyJob(void *arg){ 
 
 }
 
 // the function that creates plane threads for emergency landing
 void* AssemblyJob(void *arg){
+    pthread_mutex_lock(&MassemblyQ);
+    Job j;
+    j.ID = ++jobid;
+    j.type = 3;
+    Enqueue(assemblyQ,j);
+    printf("job added assQ");
+    fflush(stdout);
+    pthread_mutex_unlock(&MassemblyQ);
 
 }
 
 // the function that controls the air traffic
 void* ControlTower(void *arg){
+printf("kuleye girdim");
+fflush(stdout);
+	int *type = (int *) arg;
+	//1:2 ->  padA : padB
+	
+	while(time(NULL) - timeZero <= 120) {
+	if (landQ->size > 0) {
+		//do landing
+		Job ret = Dequeue(landQ);
+		printf("----------did landing\n");
+		fflush(stdout);
+		pthread_sleep(t);
+		
+		
+		
+		
+	
+	}
+	else {
+		//no landing rockets in queue, do one assembly and launch
+		if (*type == 1) {
+			//pad A do launch
+			if (launchQ-> size>0) {
+			Job ret = Dequeue(launchQ);
+			printf("-----------did launch\n");
+			fflush(stdout);
+			pthread_sleep(2*t);
+	
 
-}
+			}
+			}
+		else if (*type == 2) {
+			//pad B do assembly
+			if(assemblyQ->size >0 ) {
+			Job ret = Dequeue(assemblyQ);
+			printf("------------assembly\n");
+			fflush(stdout);
+			pthread_sleep(6*t);
+	
+	
+			}
+			}	
+		}
+	}
+	}
+
+
