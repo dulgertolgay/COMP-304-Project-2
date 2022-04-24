@@ -19,6 +19,8 @@ int jobid = 1;
     pthread_mutex_t MlandQ;
     pthread_mutex_t MlaunchQ;
     pthread_mutex_t MassemblyQ;
+    //mutex for tower
+    pthread_mutex_t Mtower;
 //global var
 
 void* LandingJob(void *arg); 
@@ -72,13 +74,20 @@ int main(int argc,char **argv){
     pthread_mutex_init(&MlandQ, NULL);
     pthread_mutex_init(&MassemblyQ, NULL);
     pthread_mutex_init(&MlaunchQ, NULL);
+    pthread_mutex_init(&Mtower, NULL);
     
 
     srand(seed); // feed the seed
     timeZero = time(NULL);
+    //first tower thread
     pthread_t towerid;
     int padID = 1;
-      pthread_create(&towerid, NULL, ControlTower,&padID);
+    pthread_create(&towerid, NULL, ControlTower,&padID);
+    //second tower thread
+    pthread_t towerid2;
+    int padID2 = 2;
+    pthread_create(&towerid2, NULL, ControlTower,&padID2);
+    
     while(time(NULL) - timeZero <= 120) {
 
     double r = (double) rand() / (double) RAND_MAX; //uniform random between 0-1
@@ -129,7 +138,7 @@ void* LandingJob(void *arg){
     j.ID = ++jobid;
     j.type = 1;
     Enqueue(landQ,j);
-    printf("job added landq");
+    printf("Spacecraft asking for landing with job id %d\n", jobid - 1);
     fflush(stdout);
     pthread_mutex_unlock(&MlandQ);
 
@@ -142,7 +151,7 @@ void* LaunchJob(void *arg){
     j.ID = ++jobid;
     j.type = 2;
     Enqueue(launchQ,j);
-    printf("job added launchQ");
+    printf("Spacecraft asking for launch with job id %d\n", jobid - 1);
     fflush(stdout);
     pthread_mutex_unlock(&MlaunchQ);
 }
@@ -159,7 +168,7 @@ void* AssemblyJob(void *arg){
     j.ID = ++jobid;
     j.type = 3;
     Enqueue(assemblyQ,j);
-    printf("job added assQ");
+    printf("Spacecraft asking for assembly with job id %d\n", jobid - 1);
     fflush(stdout);
     pthread_mutex_unlock(&MassemblyQ);
 
@@ -167,16 +176,17 @@ void* AssemblyJob(void *arg){
 
 // the function that controls the air traffic
 void* ControlTower(void *arg){
-printf("kuleye girdim");
-fflush(stdout);
 	int *type = (int *) arg;
-	//1:2 ->  padA : padB
-	
+	printf("Tower %d is online !\n", *type);
+	fflush(stdout);
 	while(time(NULL) - timeZero <= 120) {
 	if (landQ->size > 0) {
 		//do landing
+		//since towers only share the landing q, it suffices to lock only if they are dqing from landQ
+		pthread_mutex_lock(&Mtower);
 		Job ret = Dequeue(landQ);
-		printf("----------did landing\n");
+		pthread_mutex_unlock(&Mtower);
+		printf("Tower %d: Permission granted for landing to spacecraft with id %d\n",*type ,ret.ID);
 		fflush(stdout);
 		pthread_sleep(t);
 		
@@ -191,7 +201,7 @@ fflush(stdout);
 			//pad A do launch
 			if (launchQ-> size>0) {
 			Job ret = Dequeue(launchQ);
-			printf("-----------did launch\n");
+			printf("Tower %d: Permission granted for launch to spacecraft with id %d\n",*type ,ret.ID);
 			fflush(stdout);
 			pthread_sleep(2*t);
 	
@@ -202,7 +212,7 @@ fflush(stdout);
 			//pad B do assembly
 			if(assemblyQ->size >0 ) {
 			Job ret = Dequeue(assemblyQ);
-			printf("------------assembly\n");
+			printf("Tower %d: Permission granted for assembly to spacecraft with id %d\n",*type ,ret.ID);
 			fflush(stdout);
 			pthread_sleep(6*t);
 	
