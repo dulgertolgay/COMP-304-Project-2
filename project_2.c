@@ -19,8 +19,6 @@ int jobid = 1;
     pthread_mutex_t MlandQ;
     pthread_mutex_t MlaunchQ;
     pthread_mutex_t MassemblyQ;
-    //mutex for tower
-    pthread_mutex_t Mtower;
 //global var
 
 void* LandingJob(void *arg); 
@@ -67,14 +65,13 @@ int main(int argc,char **argv){
         else if(!strcmp(argv[i], "-t")) {simulationTime = atoi(argv[++i]);}
         else if(!strcmp(argv[i], "-s"))  {seed = atoi(argv[++i]);}
     }
-    landQ = ConstructQueue(100);
-    launchQ = ConstructQueue(100);
-    assemblyQ = ConstructQueue(100);
+    landQ = ConstructQueue(1000);
+    launchQ = ConstructQueue(1000);
+    assemblyQ = ConstructQueue(1000);
     //mutex init for q's
     pthread_mutex_init(&MlandQ, NULL);
     pthread_mutex_init(&MassemblyQ, NULL);
     pthread_mutex_init(&MlaunchQ, NULL);
-    pthread_mutex_init(&Mtower, NULL);
     
 
     srand(seed); // feed the seed
@@ -88,20 +85,26 @@ int main(int argc,char **argv){
     int padID2 = 2;
     pthread_create(&towerid2, NULL, ControlTower,&padID2);
     
+    //rocket waiting to take off
+    pthread_t lathread0;
+    pthread_create(&lathread0,NULL,LaunchJob,NULL);
+    
     while(time(NULL) - timeZero <= 120) {
 
     double r = (double) rand() / (double) RAND_MAX; //uniform random between 0-1
+    double r2 = (double) rand() / (double) RAND_MAX; //uniform random between 0-1
+    double r3 = (double) rand() / (double) RAND_MAX; //uniform random between 0-1
     if (r <= p/2) {
     	//launch
     	pthread_t lathread;
     	pthread_create(&lathread,NULL,LaunchJob,NULL);
     }
-    if (r>= 1-p/2) {
+    if (r2 <= p/2) {
     	//assembly
     	pthread_t asthread;
     	pthread_create(&asthread,NULL,AssemblyJob,NULL);
     }
-    else {
+    if (r3 <= 1-p) {
     	//landing
     	pthread_t lthread;
     	pthread_create(&lthread,NULL,LandingJob,NULL);
@@ -133,12 +136,14 @@ int main(int argc,char **argv){
 
 // the function that creates plane threads for landing
 void* LandingJob(void *arg){
+    printf("Spacecraft asking for landing with job id %d\n", jobid);
+    fflush(stdout);
     pthread_mutex_lock(&MlandQ);
     Job j;
     j.ID = ++jobid;
     j.type = 1;
     Enqueue(landQ,j);
-    printf("Spacecraft asking for landing with job id %d\n", jobid - 1);
+    printf("Tower: Spacecraft with job id %d is placed to position %d in the landing queue\n", jobid, landQ->size);
     fflush(stdout);
     pthread_mutex_unlock(&MlandQ);
 
@@ -146,12 +151,14 @@ void* LandingJob(void *arg){
 
 // the function that creates plane threads for departure
 void* LaunchJob(void *arg){
+    printf("Spacecraft asking for launch with job id %d\n", jobid);
+    fflush(stdout);
     pthread_mutex_lock(&MlaunchQ);
     Job j;
     j.ID = ++jobid;
     j.type = 2;
     Enqueue(launchQ,j);
-    printf("Spacecraft asking for launch with job id %d\n", jobid - 1);
+    printf("Tower: Spacecraft with job id %d is placed to position %d in the launch queue\n", jobid, launchQ->size);
     fflush(stdout);
     pthread_mutex_unlock(&MlaunchQ);
 }
@@ -163,12 +170,14 @@ void* EmergencyJob(void *arg){
 
 // the function that creates plane threads for emergency landing
 void* AssemblyJob(void *arg){
+    printf("Spacecraft asking for assembly with job id %d\n", jobid);
+    fflush(stdout);
     pthread_mutex_lock(&MassemblyQ);
     Job j;
     j.ID = ++jobid;
     j.type = 3;
     Enqueue(assemblyQ,j);
-    printf("Spacecraft asking for assembly with job id %d\n", jobid - 1);
+        printf("Tower: Spacecraft with job id %d is placed to position %d in the assembly queue\n", jobid, assemblyQ->size);
     fflush(stdout);
     pthread_mutex_unlock(&MassemblyQ);
 
@@ -183,25 +192,23 @@ void* ControlTower(void *arg){
 	if (landQ->size > 0) {
 		//do landing
 		//since towers only share the landing q, it suffices to lock only if they are dqing from landQ
-		pthread_mutex_lock(&Mtower);
+		//update: this statement is wrong since both dq and q can happen at the same time. so updating 
+		pthread_mutex_lock(&MlandQ);
 		Job ret = Dequeue(landQ);
-		pthread_mutex_unlock(&Mtower);
-		printf("Tower %d: Permission granted for landing to spacecraft with id %d\n",*type ,ret.ID);
+		pthread_mutex_unlock(&MlandQ);
+		printf("Tower: Permission granted for landing in pad %d to spacecraft with id %d\n",*type ,ret.ID);
 		fflush(stdout);
 		pthread_sleep(t);
-		
-		
-		
-		
-	
 	}
 	else {
 		//no landing rockets in queue, do one assembly and launch
 		if (*type == 1) {
 			//pad A do launch
 			if (launchQ-> size>0) {
+			pthread_mutex_lock(&MlaunchQ);
 			Job ret = Dequeue(launchQ);
-			printf("Tower %d: Permission granted for launch to spacecraft with id %d\n",*type ,ret.ID);
+			pthread_mutex_unlock(&MlaunchQ);
+			printf("Tower: Permission granted for launch in pad %d to spacecraft with id %d\n",*type ,ret.ID);
 			fflush(stdout);
 			pthread_sleep(2*t);
 	
@@ -211,8 +218,10 @@ void* ControlTower(void *arg){
 		else if (*type == 2) {
 			//pad B do assembly
 			if(assemblyQ->size >0 ) {
+			pthread_mutex_lock(&MassemblyQ);
 			Job ret = Dequeue(assemblyQ);
-			printf("Tower %d: Permission granted for assembly to spacecraft with id %d\n",*type ,ret.ID);
+			pthread_mutex_unlock(&MassemblyQ);
+			printf("Tower: Permission granted for assembly in pad %d to spacecraft with id %d\n",*type ,ret.ID);
 			fflush(stdout);
 			pthread_sleep(6*t);
 	
