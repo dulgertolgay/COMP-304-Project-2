@@ -2,11 +2,12 @@
 #include <pthread.h>
 #include <sys/time.h>
 #include <string.h>
-#define t 1
+#define t 2
 int simulationTime = 120;    // simulation time
 int seed = 10;               // seed for randomness
 int emergencyFrequency = 40*t; // frequency of emergency
-float p = 0.2;               // probability of a ground job (launch & assembly)
+float p = 0.2;   	// probability of a ground job (launch & assembly)
+int snapshotTime = 0;    //snapshot time        
 
 //global var
 int timeZero;
@@ -36,6 +37,8 @@ void* LaunchJob(void *arg);
 void* EmergencyJob(void *arg); 
 void* AssemblyJob(void *arg); 
 void* ControlTower(void *arg); 
+void createLogFile();
+void logJob(Job job, int padID);
 
 // pthread sleeper function
 int pthread_sleep (int seconds)
@@ -70,15 +73,21 @@ int main(int argc,char **argv){
     // -p (float) => sets p
     // -t (int) => simulation time in seconds
     // -s (int) => change the random seed
+    // -n (int) => snapshot time in seconds
     for(int i=1; i<argc; i++){
         if(!strcmp(argv[i], "-p")) {p = atof(argv[++i]);}
         else if(!strcmp(argv[i], "-t")) {simulationTime = atoi(argv[++i]);}
         else if(!strcmp(argv[i], "-s"))  {seed = atoi(argv[++i]);}
+        else if(!strcmp(argv[i], "-n"))  {snapshotTime = atoi(argv[++i]);}
     }
+   
+    //construct queues
     landQ = ConstructQueue(1000);
     launchQ = ConstructQueue(1000);
     assemblyQ = ConstructQueue(1000);
     emergencyQ = ConstructQueue(1000);
+    //create log file
+    createLogFile();
     //mutex init for jobid
     pthread_mutex_init(&Mjobid, NULL);
     //mutex init for q's
@@ -132,6 +141,19 @@ int main(int argc,char **argv){
     	pthread_create(&lthread,NULL,LandingJob,NULL);
     }
     
+    if (currTime >= snapshotTime) {
+     	printf("\n\n");
+      	printf("At %d sec landing  : ", currTime);
+      	PrintQueue(landQ);
+      	printf("\n");
+      	printf("At %d sec launch   : ", currTime);
+      	PrintQueue(launchQ);
+      	printf("\n");
+      	printf("At %d sec assembly : ", currTime);
+      	PrintQueue(assemblyQ);
+      	printf("\n\n");
+    }
+    
     pthread_sleep(t);
     }
     
@@ -141,8 +163,6 @@ int main(int argc,char **argv){
 
 // the function that creates plane threads for landing
 void* LandingJob(void *arg){
-    printf("Spacecraft asking for landing with job id %d\n", jobid);
-    fflush(stdout);
     pthread_mutex_lock(&MlandQ);
     pthread_mutex_lock(&Mjobid);
     jobid += 1;
@@ -150,17 +170,14 @@ void* LandingJob(void *arg){
     Job j;
     j.ID = jobid;
     j.type = 1;
+    j.reqTime = time(NULL) - timeZero;
     Enqueue(landQ,j);
-    printf("Tower: Spacecraft with job id %d is placed to position %d in the landing queue\n", jobid, landQ->size);
-    fflush(stdout);
     pthread_mutex_unlock(&MlandQ);
 
 }
 
 // the function that creates plane threads for departure
 void* LaunchJob(void *arg){
-    printf("Spacecraft asking for launch with job id %d\n", jobid);
-    fflush(stdout);
     pthread_mutex_lock(&MlaunchQ);
     pthread_mutex_lock(&Mjobid);
     jobid += 1;
@@ -168,36 +185,30 @@ void* LaunchJob(void *arg){
     Job j;
     j.ID = jobid;
     j.type = 2;
+    j.reqTime = time(NULL) - timeZero;
     Enqueue(launchQ,j);
     pthread_mutex_lock(&MlaunchCounter);
     launchCounter++;
     pthread_mutex_unlock(&MlaunchCounter);
-    printf("Tower: Spacecraft with job id %d is placed to position %d in the launch queue\n", jobid, launchQ->size);
-    fflush(stdout);
     pthread_mutex_unlock(&MlaunchQ);
 }
 
 // the function that creates plane threads for emergency landing
 void* EmergencyJob(void *arg){ 
-    printf("Spacecraft asking for emergency landing with job id %d\n", jobid);
-    fflush(stdout);
     pthread_mutex_lock(&MemergencyQ);
     pthread_mutex_lock(&Mjobid);
     jobid += 1;
     pthread_mutex_unlock(&Mjobid);
     Job j;
     j.ID = jobid;
-    j.type = 1;
+    j.type = 4;
+    j.reqTime = time(NULL) - timeZero;
     Enqueue(emergencyQ,j);
-    printf("Tower: Spacecraft with job id %d is placed to position %d in the emergency landing queue\n", jobid, emergencyQ->size);
-    fflush(stdout);
     pthread_mutex_unlock(&MemergencyQ);
 }
 
 // the function that creates plane threads for emergency landing
 void* AssemblyJob(void *arg){
-    printf("Spacecraft asking for assembly with job id %d\n", jobid);
-    fflush(stdout);
     pthread_mutex_lock(&MassemblyQ);
     pthread_mutex_lock(&Mjobid);
     jobid += 1;
@@ -205,73 +216,98 @@ void* AssemblyJob(void *arg){
     Job j;
     j.ID = jobid;
     j.type = 3;
+    j.reqTime = time(NULL) - timeZero;
     Enqueue(assemblyQ,j);
     pthread_mutex_lock(&MassemblyCounter);
     assemblyCounter++;
     pthread_mutex_unlock(&MassemblyCounter);
-    printf("Tower: Spacecraft with job id %d is placed to position %d in the assembly queue\n", jobid, assemblyQ->size);
-    fflush(stdout);
     pthread_mutex_unlock(&MassemblyQ);
 
 }
 
 // the function that controls the air traffic
 void* ControlTower(void *arg){
-	int *type = (int *) arg;
-	printf("Tower %d is online !\n", *type);
+	int *pad = (int *) arg;
+	printf("Tower %d is online!\n", *pad);
 	fflush(stdout);
 	while(time(NULL) - timeZero <= 120) {
-	if(emergencyQ->size > 0) {
+	if(!isEmpty(emergencyQ)) {
 		pthread_mutex_lock(&MemergencyQ);
 		Job ret = Dequeue(emergencyQ);
 		pthread_mutex_unlock(&MemergencyQ);
-		printf("Tower: Permission granted for emergency landing in pad %d to spacecraft with id %d\n",*type ,ret.ID);
-		fflush(stdout);
 		pthread_sleep(t);
+		logJob(ret, *pad);
 		
-	} else if (landQ->size > 0 && launchCounter < 3 && assemblyCounter < 3) {
-		//do landing
-		//since towers only share the landing q, it suffices to lock only if they are dqing from landQ
-		//update: this statement is wrong since both dq and q can happen at the same time. so updating 
+	} else if (!isEmpty(landQ) && launchCounter < 3 && assemblyCounter < 3) {
+		//do landing 
 		pthread_mutex_lock(&MlandQ);
 		Job ret = Dequeue(landQ);
 		pthread_mutex_unlock(&MlandQ);
-		printf("Tower: Permission granted for landing in pad %d to spacecraft with id %d\n",*type ,ret.ID);
-		fflush(stdout);
 		pthread_sleep(t);
+		logJob(ret, *pad);
 		
 	} else {
 		//no landing rockets in queue, do one assembly and launch
-		if (*type == 1 || launchCounter < 3) {
+		if (!isEmpty(launchQ) && *pad == 1) {
 			//pad A do launch
-			if (launchQ-> size>0) {
 			pthread_mutex_lock(&MlaunchQ);
 			Job ret = Dequeue(launchQ);
 			pthread_mutex_lock(&MlaunchCounter);
     			launchCounter--;
     			pthread_mutex_unlock(&MlaunchCounter);
 			pthread_mutex_unlock(&MlaunchQ);
-			printf("Tower: Permission granted for launch in pad %d to spacecraft with id %d\n",*type ,ret.ID);
-			fflush(stdout);
 			pthread_sleep(2*t);
-			}
+			logJob(ret, *pad);
 		}
-		else if (*type == 2 || assemblyCounter < 3) {
+		else if (!isEmpty(assemblyQ) && *pad == 2) {
 			//pad B do assembly
-			if(assemblyQ->size >0 ) {
 			pthread_mutex_lock(&MassemblyQ);
 			Job ret = Dequeue(assemblyQ);
 			pthread_mutex_lock(&MassemblyCounter);
     			assemblyCounter--;
     			pthread_mutex_unlock(&MassemblyCounter);
 			pthread_mutex_unlock(&MassemblyQ);
-			printf("Tower: Permission granted for assembly in pad %d to spacecraft with id %d\n",*type ,ret.ID);
-			fflush(stdout);
 			pthread_sleep(6*t);
-			}
+			logJob(ret, *pad);
 		}	
 	}
 }
 }
+
+void createLogFile() {
+	FILE *fp = fopen("events.log", "w");
+  	fprintf(fp, "\tEventID\tStatus\t\tRequest Time\tEnd Time\tTurnaround Time\tPad\n");
+  	fprintf(fp, "    -------------------------------------------------------------------------------------------------\n");
+  	fclose(fp);
+}
+
+void logJob(Job job, int padID) {
+	job.endTime = time(NULL) - timeZero;
+	char status;
+	switch(job.type){  
+		case 1:  
+			status = 'L';
+			break;
+		case 2:  
+			status = 'D';
+			break;
+		case 3:  
+			status = 'A';
+			break;
+		case 4:  
+			status = 'E';
+			break; 
+		default:  
+			printf("Error! Job has no type.\n"); 
+	}  
+	FILE *fp = fopen("events.log", "a");
+  	fprintf(fp, "\t%d\t\t%c\t\t%d\t\t%d\t\t%d\t\t\t%c\n", job.ID, status, job.reqTime, job.endTime, job.endTime - job.reqTime, padID == 1 ? 'A' : 'B');
+  	fclose(fp);
+}
+
+
+
+
+
 
 

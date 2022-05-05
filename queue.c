@@ -8,6 +8,8 @@ typedef struct {
     int ID;
     int type;
     // you might want to add variables here!
+    int reqTime;
+    int endTime;
 } Job;
 
 /* a link in the queue, holds the data and point to the next Node */
@@ -29,6 +31,7 @@ void DestructQueue(Queue *queue);
 int Enqueue(Queue *pQueue, Job j);
 Job Dequeue(Queue *pQueue);
 int isEmpty(Queue* pQueue);
+void PrintQueue(Queue *pQueue);
 
 Queue *ConstructQueue(int limit) {
     Queue *queue = (Queue*) malloc(sizeof (Queue));
@@ -105,3 +108,20 @@ int isEmpty(Queue* pQueue) {
         return FALSE;
     }
 }
+
+//Print queue to keep the logs
+void PrintQueue(struct Queue* pQueue) {
+	NODE *temp; 
+	Job j;
+	if (isEmpty(pQueue))
+        	return;
+	temp = pQueue->head;
+	while(temp != NULL) {
+		j = temp->data;
+		printf("%d", j.ID);
+		printf(temp->prev == NULL ? "" : ", ");
+		fflush(stdout);
+		temp = temp->prev;
+	}
+}
+
