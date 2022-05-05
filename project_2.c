@@ -125,12 +125,12 @@ int main(int argc,char **argv){
   		pthread_create(&emergencythread,NULL,EmergencyJob,NULL);
     	}
     }
-    if (r <= p/2) {
+    if (r <= 4*p/2) {
     	//launch
     	pthread_t lathread;
     	pthread_create(&lathread,NULL,LaunchJob,NULL);
     }
-    if (r2 <= p/2) {
+    if (r2 <= 4*p/2) {
     	//assembly
     	pthread_t asthread;
     	pthread_create(&asthread,NULL,AssemblyJob,NULL);
@@ -141,20 +141,23 @@ int main(int argc,char **argv){
     	pthread_create(&lthread,NULL,LandingJob,NULL);
     }
     
-    if (currTime >= snapshotTime) {
+    for (int i = 0; i<t; i++) {
+    if (snapshotTime != 0  && currTime >= snapshotTime) {
      	printf("\n\n");
-      	printf("At %d sec landing  : ", currTime);
+      	printf("At %ld sec landing  : ", time(NULL) - timeZero);
       	PrintQueue(landQ);
       	printf("\n");
-      	printf("At %d sec launch   : ", currTime);
+      	printf("At %ld sec launch   : ", time(NULL) - timeZero);
       	PrintQueue(launchQ);
       	printf("\n");
-      	printf("At %d sec assembly : ", currTime);
+      	printf("At %ld sec assembly : ", time(NULL) - timeZero);
       	PrintQueue(assemblyQ);
       	printf("\n\n");
     }
     
-    pthread_sleep(t);
+    pthread_sleep(1);
+    }
+    
     }
     
     pthread_join(towerid,NULL);
@@ -238,7 +241,7 @@ void* ControlTower(void *arg){
 		pthread_sleep(t);
 		logJob(ret, *pad);
 		
-	} else if (!isEmpty(landQ) && launchCounter < 3 && assemblyCounter < 3) {
+	} else if ((!isEmpty(landQ) && launchCounter < 3 && assemblyCounter < 3) || landQ->size >= 5) {
 		//do landing 
 		pthread_mutex_lock(&MlandQ);
 		Job ret = Dequeue(landQ);
