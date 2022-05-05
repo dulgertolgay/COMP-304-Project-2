@@ -12,6 +12,8 @@ int snapshotTime = 0;    //snapshot time
 //global var
 int timeZero;
 int jobid = 1;
+pthread_t threads[1024] = {0}; // Max number of threads
+int threadCount = 0; // Total number of created threads
 //queues for all different jobs
 Queue* landQ;
 Queue* launchQ;
@@ -102,13 +104,11 @@ int main(int argc,char **argv){
     srand(seed); // feed the seed
     timeZero = time(NULL);
     //first tower thread
-    pthread_t towerid;
     int padID = 1;
-    pthread_create(&towerid, NULL, ControlTower,&padID);
+    pthread_create(&threads[threadCount++], NULL, ControlTower,&padID);
     //second tower thread
-    pthread_t towerid2;
     int padID2 = 2;
-    pthread_create(&towerid2, NULL, ControlTower,&padID2);
+    pthread_create(&threads[threadCount++], NULL, ControlTower,&padID2);
     
     //rocket waiting to take off
     pthread_t lathread0;
@@ -121,24 +121,20 @@ int main(int argc,char **argv){
     double r3 = (double) rand() / (double) RAND_MAX; //uniform random between 0-1
     if(currTime > 0 && (currTime % emergencyFrequency) == 0) {
     	for(int i = 0; i < 2; i++) {
-    		pthread_t emergencythread;
-  		pthread_create(&emergencythread,NULL,EmergencyJob,NULL);
+  		pthread_create(&threads[threadCount++],NULL,EmergencyJob,NULL);
     	}
     }
     if (r <= p/2) {
     	//launch
-    	pthread_t lathread;
-    	pthread_create(&lathread,NULL,LaunchJob,NULL);
+    	pthread_create(&threads[threadCount++],NULL,LaunchJob,NULL);
     }
     if (r2 <= p/2) {
     	//assembly
-    	pthread_t asthread;
-    	pthread_create(&asthread,NULL,AssemblyJob,NULL);
+    	pthread_create(&threads[threadCount++],NULL,AssemblyJob,NULL);
     }
     if (r3 <= 1-p) {
     	//landing
-    	pthread_t lthread;
-    	pthread_create(&lthread,NULL,LandingJob,NULL);
+    	pthread_create(&threads[threadCount++],NULL,LandingJob,NULL);
     }
     
     for (int i = 0; i<t; i++) {
@@ -160,7 +156,9 @@ int main(int argc,char **argv){
     
     }
     
-    pthread_join(towerid,NULL);
+    for (int i=0; i<threadCount; ++i)
+	pthread_join(threads[i], NULL);
+		
     return 0;
 }
 
@@ -231,8 +229,6 @@ void* AssemblyJob(void *arg){
 // the function that controls the air traffic
 void* ControlTower(void *arg){
 	int *pad = (int *) arg;
-	printf("Tower %d is online!\n", *pad);
-	fflush(stdout);
 	while(time(NULL) - timeZero <= 120) {
 	if(!isEmpty(emergencyQ)) {
 		pthread_mutex_lock(&MemergencyQ);
