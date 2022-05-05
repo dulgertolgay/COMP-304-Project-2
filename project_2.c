@@ -164,6 +164,8 @@ int main(int argc,char **argv){
 
 // the function that creates plane threads for landing
 void* LandingJob(void *arg){
+    printf("Spacecraft asking for landing with job id %d\n", jobid++);
+    fflush(stdout);
     pthread_mutex_lock(&MlandQ);
     pthread_mutex_lock(&Mjobid);
     jobid += 1;
@@ -173,12 +175,16 @@ void* LandingJob(void *arg){
     j.type = 1;
     j.reqTime = time(NULL) - timeZero;
     Enqueue(landQ,j);
+    printf("Tower: %d in the landing queue\n", jobid, landQ->size);
+    fflush(stdout);
     pthread_mutex_unlock(&MlandQ);
 
 }
 
 // the function that creates plane threads for departure
 void* LaunchJob(void *arg){
+    printf("Spacecraft asking for launch with job id %d\n", jobid++);
+    fflush(stdout);
     pthread_mutex_lock(&MlaunchQ);
     pthread_mutex_lock(&Mjobid);
     jobid += 1;
@@ -191,11 +197,15 @@ void* LaunchJob(void *arg){
     pthread_mutex_lock(&MlaunchCounter);
     launchCounter++;
     pthread_mutex_unlock(&MlaunchCounter);
+    printf("Tower: %d in the launch queue\n", jobid, launchQ->size);
+    fflush(stdout);
     pthread_mutex_unlock(&MlaunchQ);
 }
 
 // the function that creates plane threads for emergency landing
 void* EmergencyJob(void *arg){ 
+    printf("Spacecraft asking for emergency landing with job id %d\n", jobid++);
+    fflush(stdout);
     pthread_mutex_lock(&MemergencyQ);
     pthread_mutex_lock(&Mjobid);
     jobid += 1;
@@ -205,11 +215,15 @@ void* EmergencyJob(void *arg){
     j.type = 4;
     j.reqTime = time(NULL) - timeZero;
     Enqueue(emergencyQ,j);
+    printf("Tower: %d in the emergency landing queue\n", jobid, emergencyQ->size);
+    fflush(stdout);
     pthread_mutex_unlock(&MemergencyQ);
 }
 
 // the function that creates plane threads for emergency landing
 void* AssemblyJob(void *arg){
+    printf("Spacecraft asking for assembly with job id %d\n", jobid++);
+    fflush(stdout);
     pthread_mutex_lock(&MassemblyQ);
     pthread_mutex_lock(&Mjobid);
     jobid += 1;
@@ -222,6 +236,8 @@ void* AssemblyJob(void *arg){
     pthread_mutex_lock(&MassemblyCounter);
     assemblyCounter++;
     pthread_mutex_unlock(&MassemblyCounter);
+    printf("Tower: %d in the assembly queue\n", jobid, assemblyQ->size);
+    fflush(stdout);
     pthread_mutex_unlock(&MassemblyQ);
 
 }
