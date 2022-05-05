@@ -175,7 +175,7 @@ void* LandingJob(void *arg){
     j.type = 1;
     j.reqTime = time(NULL) - timeZero;
     Enqueue(landQ,j);
-    printf("Tower: %d in the landing queue\n", jobid, landQ->size);
+    printf("Tower: %d in the landing queue\n", landQ->size);
     fflush(stdout);
     pthread_mutex_unlock(&MlandQ);
 
@@ -197,7 +197,7 @@ void* LaunchJob(void *arg){
     pthread_mutex_lock(&MlaunchCounter);
     launchCounter++;
     pthread_mutex_unlock(&MlaunchCounter);
-    printf("Tower: %d in the launch queue\n", jobid, launchQ->size);
+    printf("Tower: %d in the launch queue\n", launchQ->size);
     fflush(stdout);
     pthread_mutex_unlock(&MlaunchQ);
 }
@@ -215,7 +215,7 @@ void* EmergencyJob(void *arg){
     j.type = 4;
     j.reqTime = time(NULL) - timeZero;
     Enqueue(emergencyQ,j);
-    printf("Tower: %d in the emergency landing queue\n", jobid, emergencyQ->size);
+    printf("Tower: %d in the emergency landing queue\n", emergencyQ->size);
     fflush(stdout);
     pthread_mutex_unlock(&MemergencyQ);
 }
@@ -236,7 +236,7 @@ void* AssemblyJob(void *arg){
     pthread_mutex_lock(&MassemblyCounter);
     assemblyCounter++;
     pthread_mutex_unlock(&MassemblyCounter);
-    printf("Tower: %d in the assembly queue\n", jobid, assemblyQ->size);
+    printf("Tower: %d in the assembly queue\n", assemblyQ->size);
     fflush(stdout);
     pthread_mutex_unlock(&MassemblyQ);
 
