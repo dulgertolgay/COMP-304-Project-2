@@ -34,3 +34,5 @@ Part 3:
 
 Keeping Logs:
   For this part, we have added reqTime and endTime variables to the job struct to be able to calculate the turnaround time for each job. Also, we have implemented a simple PrintQueue function in queue.c to display queues, createLogFile function to create the log file, and logJob function to log every job when it is dequeued. Rest is straightforward, create the log file in main with createLogFile function and log every dequeued job to the log file with logJob function.
+  
+ Project report can be accessed via this link: https://docs.google.com/document/d/1BlxZLv2zAcd0z6aW81wYBQcM6j16S2bfNy2LQhbheCc/edit?usp=sharing
