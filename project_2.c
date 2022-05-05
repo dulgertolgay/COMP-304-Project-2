@@ -125,12 +125,12 @@ int main(int argc,char **argv){
   		pthread_create(&emergencythread,NULL,EmergencyJob,NULL);
     	}
     }
-    if (r <= 4*p/2) {
+    if (r <= p/2) {
     	//launch
     	pthread_t lathread;
     	pthread_create(&lathread,NULL,LaunchJob,NULL);
     }
-    if (r2 <= 4*p/2) {
+    if (r2 <= p/2) {
     	//assembly
     	pthread_t asthread;
     	pthread_create(&asthread,NULL,AssemblyJob,NULL);
